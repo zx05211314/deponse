@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Slider } from '@/components/ui/slider';
 import { Camera as CameraIcon, Square, Play, Pause, Settings, AlertTriangle } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import AppSettings from './AppSettings';
 
 interface MonitoringArea {
   id: string;
@@ -29,6 +30,7 @@ const SceneMonitor: React.FC = () => {
   const [referenceImage, setReferenceImage] = useState<string | null>(null);
   const [monitoringAreas, setMonitoringAreas] = useState<MonitoringArea[]>([]);
   const [changeDetected, setChangeDetected] = useState(false);
+  const [language, setLanguage] = useState('en');
   const [settings, setSettings] = useState<ChangeDetectionSettings>({
     sensitivity: 50,
     threshold: 25,
@@ -199,11 +201,14 @@ const SceneMonitor: React.FC = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-card to-background p-4 space-y-6">
       {/* Header */}
-      <div className="text-center space-y-2">
-        <h1 className="text-3xl font-bold bg-gradient-to-r from-primary to-primary-glow bg-clip-text text-transparent">
-          Scene Sentinel
-        </h1>
-        <p className="text-muted-foreground">Advanced Mobile Change Detection</p>
+      <div className="flex items-center justify-between mb-6">
+        <div className="text-center flex-1">
+          <h1 className="text-3xl font-bold bg-gradient-to-r from-primary to-primary-glow bg-clip-text text-transparent">
+            Scene Sentinel
+          </h1>
+          <p className="text-muted-foreground">Advanced Mobile Change Detection</p>
+        </div>
+        <AppSettings language={language} onLanguageChange={setLanguage} />
       </div>
 
       {/* Status Card */}
