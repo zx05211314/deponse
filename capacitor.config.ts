@@ -2,7 +2,7 @@ import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
   appId: 'app.lovable.c106a358eb394ba8b59bf2a350671d26',
-  appName: 'scene-sentinel-watchdog',
+  appName: 'deponse',
   webDir: 'dist',
   server: {
     url: 'https://c106a358-eb39-4ba8-b59b-f2a350671d26.lovableproject.com?forceHideBadge=true',
