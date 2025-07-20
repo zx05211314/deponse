@@ -1,22 +1,19 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
 import { LocalNotifications } from '@capacitor/local-notifications';
+import { Haptics, ImpactStyle } from '@capacitor/haptics';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Slider } from '@/components/ui/slider';
-import { Camera as CameraIcon, Square, Play, Pause, Settings, AlertTriangle } from 'lucide-react';
+import { Camera as CameraIcon, Square, Play, Pause, Settings, AlertTriangle, Battery, Zap } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import AppSettings from './AppSettings';
-
-interface MonitoringArea {
-  id: string;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  name: string;
-}
+import RegionSelector, { MonitoringRegion } from './RegionSelector';
+import DetectionFilters, { DetectionSettings } from './DetectionFilters';
+import ActionSettings, { ActionSettings as ActionSettingsType } from './ActionSettings';
+import DetectionHistory, { DetectionEvent } from './DetectionHistory';
+import SecuritySettings from './SecuritySettings';
 
 interface ChangeDetectionSettings {
   sensitivity: number; // 0-100
@@ -28,13 +25,33 @@ const SceneMonitor: React.FC = () => {
   const [isMonitoring, setIsMonitoring] = useState(false);
   const [currentImage, setCurrentImage] = useState<string | null>(null);
   const [referenceImage, setReferenceImage] = useState<string | null>(null);
-  const [monitoringAreas, setMonitoringAreas] = useState<MonitoringArea[]>([]);
+  const [monitoringRegions, setMonitoringRegions] = useState<MonitoringRegion[]>([]);
   const [changeDetected, setChangeDetected] = useState(false);
   const [language, setLanguage] = useState('en');
+  const [isLocked, setIsLocked] = useState(false);
+  const [energySaving, setEnergySaving] = useState(false);
+  
+  // Detection events history
+  const [detectionEvents, setDetectionEvents] = useState<DetectionEvent[]>([]);
+  
+  // Settings
   const [settings, setSettings] = useState<ChangeDetectionSettings>({
     sensitivity: 50,
     threshold: 25,
     alertEnabled: true,
+  });
+  
+  const [detectionSettings, setDetectionSettings] = useState<DetectionSettings>({
+    pixelDifference: { enabled: true, sensitivity: 50 },
+    colorBlockChange: { enabled: true, threshold: 30 },
+    textContentChange: { enabled: false, confidence: 70 }
+  });
+  
+  const [actionSettings, setActionSettings] = useState<ActionSettingsType>({
+    playSound: { enabled: true, volume: 80 },
+    vibratePhone: { enabled: true, intensity: 70 },
+    pushAlert: { enabled: true },
+    captureScreenshot: { enabled: true, quality: 90 }
   });
   
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -200,6 +217,16 @@ const SceneMonitor: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-card to-background p-4 space-y-6">
+      {/* Security Lock Overlay */}
+      {isLocked && (
+        <SecuritySettings
+          language={language}
+          isLocked={isLocked}
+          onLockToggle={setIsLocked}
+          onAuthSuccess={() => setIsLocked(false)}
+        />
+      )}
+
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div className="text-center flex-1">
@@ -208,7 +235,10 @@ const SceneMonitor: React.FC = () => {
           </h1>
           <p className="text-muted-foreground">Advanced Mobile Change Detection</p>
         </div>
-        <AppSettings language={language} onLanguageChange={setLanguage} />
+        <div className="flex gap-2">
+          {energySaving && <Badge variant="outline"><Battery className="w-3 h-3 mr-1" />Power Save</Badge>}
+          <AppSettings language={language} onLanguageChange={setLanguage} />
+        </div>
       </div>
 
       {/* Status Card */}
@@ -232,8 +262,7 @@ const SceneMonitor: React.FC = () => {
           )}
         </div>
 
-        {/* Control Buttons */}
-        <div className="flex gap-3">
+        <div className="flex gap-3 mb-4">
           {!isMonitoring ? (
             <Button 
               onClick={startMonitoring}
@@ -262,69 +291,68 @@ const SceneMonitor: React.FC = () => {
             Reset Reference
           </Button>
         </div>
-      </Card>
-
-      {/* Settings Card */}
-      <Card className="p-6 bg-card/50 backdrop-blur border-border/50">
-        <div className="flex items-center gap-2 mb-4">
-          <Settings className="w-5 h-5 text-primary" />
-          <h3 className="font-semibold">Detection Settings</h3>
-        </div>
         
-        <div className="space-y-6">
-          <div>
-            <label className="text-sm font-medium mb-2 block">
-              Sensitivity: {settings.sensitivity}%
-            </label>
-            <Slider
-              value={[settings.sensitivity]}
-              onValueChange={(value) => setSettings(prev => ({ ...prev, sensitivity: value[0] }))}
-              max={100}
-              step={1}
-              className="w-full"
-            />
-            <p className="text-xs text-muted-foreground mt-1">
-              Higher values detect smaller changes
-            </p>
-          </div>
-
-          <div>
-            <label className="text-sm font-medium mb-2 block">
-              Change Threshold: {settings.threshold}%
-            </label>
-            <Slider
-              value={[settings.threshold]}
-              onValueChange={(value) => setSettings(prev => ({ ...prev, threshold: value[0] }))}
-              max={100}
-              step={1}
-              className="w-full"
-            />
-            <p className="text-xs text-muted-foreground mt-1">
-              Minimum change percentage to trigger alert
-            </p>
-          </div>
+        <div className="flex items-center gap-2">
+          <Zap className="w-4 h-4 text-primary" />
+          <span className="text-sm">Energy Saving Mode</span>
+          <input 
+            type="checkbox" 
+            checked={energySaving} 
+            onChange={(e) => setEnergySaving(e.target.checked)}
+            className="ml-auto"
+          />
         </div>
       </Card>
 
-      {/* Image Preview */}
+      {/* Region Selection */}
       {currentImage && (
-        <Card className="p-4 bg-card/50 backdrop-blur border-border/50">
-          <h3 className="font-semibold mb-3 flex items-center gap-2">
-            <CameraIcon className="w-4 h-4 text-primary" />
-            Current View
-          </h3>
-          <div className="relative">
-            <img 
-              src={currentImage} 
-              alt="Current monitoring view" 
-              className="w-full rounded-lg border border-border/50"
-            />
-            {changeDetected && (
-              <div className="absolute inset-0 border-2 border-destructive rounded-lg animate-pulse" />
-            )}
-          </div>
-        </Card>
+        <RegionSelector
+          imageUrl={currentImage}
+          regions={monitoringRegions}
+          onRegionsChange={setMonitoringRegions}
+          language={language}
+        />
       )}
+
+      {/* Detection Filters */}
+      <DetectionFilters
+        settings={detectionSettings}
+        onSettingsChange={setDetectionSettings}
+        language={language}
+      />
+
+      {/* Action Settings */}
+      <ActionSettings
+        settings={actionSettings}
+        onSettingsChange={setActionSettings}
+        language={language}
+      />
+
+      {/* Detection History */}
+      <DetectionHistory
+        events={detectionEvents}
+        onClearHistory={() => setDetectionEvents([])}
+        onExportHistory={(format) => {
+          const data = format === 'csv' 
+            ? detectionEvents.map(e => `${e.timestamp},${e.type},${e.confidence}%,${e.description}`).join('\n')
+            : detectionEvents.map(e => `${e.timestamp}: ${e.description} (${e.confidence}%)`).join('\n');
+          const blob = new Blob([data], { type: `text/${format}` });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `detection-history.${format}`;
+          a.click();
+        }}
+        language={language}
+      />
+
+      {/* Security Settings */}
+      <SecuritySettings
+        language={language}
+        isLocked={false}
+        onLockToggle={setIsLocked}
+        onAuthSuccess={() => {}}
+      />
 
       {/* Hidden canvas for image processing */}
       <canvas ref={canvasRef} className="hidden" />
